@@ -258,7 +258,7 @@ export default function App() {
         isFavorite: t.is_favorite || false, dexScreenerUrl: t.dex_screener_url, notes: t.notes || ''
       })));
       if (walletsData) setWallets(walletsData.map(w => ({
-        id: w.id, address: w.address, buyVolume: w.buy_volume, sell_volume: w.sell_volume, profit: w.profit, source: w.source,
+        id: w.id, address: w.address, buyVolume: w.buy_volume, sellVolume: w.sell_volume, profit: w.profit, source: w.source,
         network: w.network as Network, age: w.age, dateAdded: w.date_added, status: w.status as Status, multiplier: w.multiplier,
         winRate: w.win_rate || 50, customLink: w.custom_link, gmgnLink: w.gmgn_link, isFavorite: w.is_favorite || false, notes: w.notes || ''
       })));
@@ -634,8 +634,8 @@ export default function App() {
                             <StatusBadge status={wallet.status} />
                           </div>
                           <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-4">
-                            <div><span className="text-[10px] uppercase font-bold text-slate-400 block mb-1 tracking-wider">Buy Vol</span><span className="font-bold text-slate-700">{wallet.buyVolume || '$0'}</span></div>
-                            <div><span className="text-[10px] uppercase font-bold text-slate-400 block mb-1 tracking-wider">Sell Vol</span><span className="font-bold text-slate-700">{wallet.sellVolume || '$0'}</span></div>
+                            <div><span className="text-[10px] uppercase font-bold text-slate-400 block mb-1 tracking-wider">Buy Vol</span><span className="font-bold text-blue-600">{wallet.buyVolume || '$0'}</span></div>
+                            <div><span className="text-[10px] uppercase font-bold text-slate-400 block mb-1 tracking-wider">Sell Vol</span><span className="font-bold text-rose-600">{wallet.sellVolume || '$0'}</span></div>
                             <div><span className="text-[10px] uppercase font-bold text-slate-400 block mb-1 tracking-wider">Profit</span><span className={`font-extrabold text-lg ${wallet.profit.startsWith('+') ? 'text-emerald-600' : 'text-rose-600'}`}>{wallet.profit || '$0'}</span></div>
                             <div><span className="text-[10px] uppercase font-bold text-slate-400 block mb-1 tracking-wider">Mult.</span><span className="font-extrabold text-indigo-600">{wallet.multiplier}</span></div>
                           </div>
