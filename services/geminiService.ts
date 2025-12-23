@@ -2,11 +2,11 @@
 import { GoogleGenAI } from "@google/genai";
 import { Network, Status } from "../types";
 
-// Always use const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-
 export const parseDexScreenerData = async (query: string) => {
   try {
+    // Instantiate inside the function to avoid top-level module crashes if API_KEY is empty
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    
     let searchTerm = query.trim();
     const urlMatch = searchTerm.match(/dexscreener\.com\/[^\/]+\/([a-zA-Z0-9]+)/);
     if (urlMatch && urlMatch[1]) {
