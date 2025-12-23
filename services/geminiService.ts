@@ -1,13 +1,15 @@
 
-import { GoogleGenAI } from "@google/genai";
 import { Network, Status } from "../types";
 
+/**
+ * این تابع به طور کامل از API عمومی DexScreener استفاده می‌کند
+ * و هیچ وابستگی به هوش مصنوعی (AI) یا کلید API گوگل ندارد.
+ */
 export const parseDexScreenerData = async (query: string) => {
   try {
-    // Instantiate inside the function to avoid top-level module crashes if API_KEY is empty
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
-    
     let searchTerm = query.trim();
+    
+    // استخراج آدرس توکن از URL اگر ورودی یک لینک باشد
     const urlMatch = searchTerm.match(/dexscreener\.com\/[^\/]+\/([a-zA-Z0-9]+)/);
     if (urlMatch && urlMatch[1]) {
         searchTerm = urlMatch[1];
@@ -16,18 +18,23 @@ export const parseDexScreenerData = async (query: string) => {
         searchTerm = parts[parts.length - 1];
     }
 
+    // فراخوانی مستقیم API رایگان DexScreener
     const apiUrl = `https://api.dexscreener.com/latest/dex/search?q=${searchTerm}`;
     const response = await fetch(apiUrl);
+    
     if (!response.ok) {
-        throw new Error(`API request failed with status ${response.status}`);
+        throw new Error(`خطا در برقراری ارتباط با سرویس داده: ${response.status}`);
     }
     
     const data = await response.json();
     if (!data.pairs || data.pairs.length === 0) {
-        throw new Error("No pairs found for this token/url");
+        throw new Error("هیچ اطلاعاتی برای این توکن پیدا نشد.");
     }
 
+    // انتخاب بهترین جفت معاملاتی (معمولاً اولین مورد معتبرترین است)
     const pair = data.pairs[0];
+    
+    // تشخیص شبکه
     let network = Network.OTHER;
     const chainId = (pair.chainId || '').toLowerCase();
     if (chainId.includes('sol')) network = Network.SOLANA;
@@ -35,12 +42,14 @@ export const parseDexScreenerData = async (query: string) => {
     else if (chainId.includes('base')) network = Network.BASE;
     else if (chainId.includes('bsc')) network = Network.BSC;
 
+    // تعیین وضعیت بر اساس نقدینگی
     let status = Status.GOOD;
     const liquidity = pair.liquidity?.usd || 0;
     if (liquidity > 500000) {
         status = Status.EXCELLENT;
     }
 
+    // محاسبه سن توکن
     let age = "New";
     if (pair.pairCreatedAt) {
         const created = new Date(pair.pairCreatedAt);
@@ -59,6 +68,7 @@ export const parseDexScreenerData = async (query: string) => {
 
     const priceChange = pair.priceChange?.h24 ? `${pair.priceChange.h24 > 0 ? '+' : ''}${pair.priceChange.h24}%` : '0%';
 
+    // فرمت‌دهی اعداد بزرگ
     const fmt = (num: number) => {
         if (!num) return '$0';
         if (num >= 1000000000) return `$${(num / 1000000000).toFixed(2)}B`;
@@ -80,7 +90,7 @@ export const parseDexScreenerData = async (query: string) => {
     };
 
   } catch (error) {
-    console.error("DexScreener Service Error:", error);
+    console.error("DexScreener API Error:", error);
     throw error;
   }
 };
