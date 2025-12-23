@@ -446,16 +446,16 @@ export default function App() {
     </div>
   );
 
-  // Stats Calculations
-  const stats = useMemo(() => {
-    const combined = [...coins, ...wallets];
+  // Stats Calculations (Separated per tab)
+  const currentStats = useMemo(() => {
+    const list = activeTab === 'watchlist' ? coins : wallets;
     return {
-      total: combined.length,
-      good: combined.filter(i => i.status === Status.GOOD).length,
-      excellent: combined.filter(i => i.status === Status.EXCELLENT).length,
-      favorites: combined.filter(i => i.isFavorite).length
+      total: list.length,
+      good: list.filter(i => i.status === Status.GOOD).length,
+      excellent: list.filter(i => i.status === Status.EXCELLENT).length,
+      favorites: list.filter(i => i.isFavorite).length
     };
-  }, [coins, wallets]);
+  }, [activeTab, coins, wallets]);
 
   return (
     <div className="h-screen w-full bg-slate-50 text-slate-900 flex flex-col md:flex-row font-sans overflow-hidden">
@@ -473,10 +473,10 @@ export default function App() {
       <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto w-full h-full">
         <div className="w-full">
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatsCard title="TOTAL" value={stats.total} icon={<Hash size={20} className="text-slate-500" />} />
-            <StatsCard title="GOOD" value={stats.good} icon={<ShieldCheck size={20} className="text-emerald-500" />} />
-            <StatsCard title="EXCELLENT" value={stats.excellent} icon={<Award size={20} className="text-indigo-500" />} />
-            <StatsCard title="Total Favorites" value={stats.favorites} icon={<Star size={20} className="text-amber-500 fill-amber-500" />} />
+            <StatsCard title={`TOTAL ${activeTab === 'watchlist' ? 'TOKENS' : 'WALLETS'}`} value={currentStats.total} icon={<Hash size={20} className="text-slate-500" />} />
+            <StatsCard title="GOOD" value={currentStats.good} icon={<ShieldCheck size={20} className="text-emerald-500" />} />
+            <StatsCard title="EXCELLENT" value={currentStats.excellent} icon={<Award size={20} className="text-indigo-500" />} />
+            <StatsCard title="Total Favorites" value={currentStats.favorites} icon={<Star size={20} className="text-amber-500 fill-amber-500" />} />
           </div>
 
           <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
