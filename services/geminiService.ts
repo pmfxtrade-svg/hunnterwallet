@@ -2,8 +2,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { Network, Status } from "../types";
 
-// Fix: Use process.env.API_KEY directly as per guidelines
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Safety check for process.env to prevent top-level crashes in browser environments
+const apiKey = typeof process !== 'undefined' && process.env.API_KEY ? process.env.API_KEY : '';
+const ai = new GoogleGenAI({ apiKey });
 
 // Direct integration with DexScreener API
 export const parseDexScreenerData = async (query: string) => {

@@ -1,3 +1,4 @@
+
 <!DOCTYPE html>
 <html lang="en">
   <head>
@@ -27,6 +28,10 @@
         background: #94a3b8; 
       }
     </style>
+    <!-- Polyfill for process.env to prevent blank page crashes on deployment -->
+    <script>
+      window.process = { env: { API_KEY: "" } };
+    </script>
   <script type="importmap">
 {
   "imports": {
@@ -42,5 +47,7 @@
 </head>
   <body>
     <div id="root"></div>
+    <!-- Entry point for the application -->
+    <script type="module" src="./index.tsx"></script>
   </body>
 </html>
