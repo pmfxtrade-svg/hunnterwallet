@@ -2,11 +2,9 @@
 import { GoogleGenAI } from "@google/genai";
 import { Network, Status } from "../types";
 
-// Safety check for process.env to prevent top-level crashes in browser environments
-const apiKey = typeof process !== 'undefined' && process.env.API_KEY ? process.env.API_KEY : '';
-const ai = new GoogleGenAI({ apiKey });
+// Always use const ai = new GoogleGenAI({apiKey: process.env.API_KEY});
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-// Direct integration with DexScreener API
 export const parseDexScreenerData = async (query: string) => {
   try {
     let searchTerm = query.trim();
@@ -59,6 +57,8 @@ export const parseDexScreenerData = async (query: string) => {
         else age = `${diffMonths}mo`;
     }
 
+    const priceChange = pair.priceChange?.h24 ? `${pair.priceChange.h24 > 0 ? '+' : ''}${pair.priceChange.h24}%` : '0%';
+
     const fmt = (num: number) => {
         if (!num) return '$0';
         if (num >= 1000000000) return `$${(num / 1000000000).toFixed(2)}B`;
@@ -72,6 +72,7 @@ export const parseDexScreenerData = async (query: string) => {
         marketCap: fmt(pair.marketCap || pair.fdv || 0),
         liquidity: fmt(liquidity),
         age: age,
+        priceChange: priceChange,
         network: network,
         status: status,
         customLink: pair.url,

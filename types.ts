@@ -1,3 +1,5 @@
+
+// Status enum for token and wallet health/performance
 export enum Status {
   GOOD = 'Good',
   EXCELLENT = 'Excellent',
@@ -16,13 +18,15 @@ export interface Coin {
   name: string;
   marketCap: string;
   liquidity: string;
-  age: string; // e.g., "2 days", "4 hours"
+  age: string; 
+  priceChange: string; // 24h Change percentage
   dateAdded: string;
   network: Network;
-  status: Status;
+  status?: Status;
   customLink?: string;
   isFavorite: boolean;
   dexScreenerUrl?: string;
+  notes?: string;
 }
 
 export interface Wallet {
@@ -30,16 +34,17 @@ export interface Wallet {
   address: string;
   buyVolume: string;
   sellVolume: string;
-  profit: string; // P&L
-  source: string; // GMGN, Birdeye
+  profit: string; 
+  source: string; 
   network: Network;
   age: string;
   dateAdded: string;
-  status: Status;
   multiplier: string;
-  winRate: number; // Percentage 0-100
+  winRate: number; 
+  status?: Status;
   customLink?: string;
   isFavorite: boolean;
+  notes?: string;
 }
 
 export interface StatsData {
