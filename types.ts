@@ -43,6 +43,7 @@ export interface Wallet {
   winRate: number; 
   status?: Status;
   customLink?: string;
+  gmgnLink?: string;
   isFavorite: boolean;
   notes?: string;
 }
