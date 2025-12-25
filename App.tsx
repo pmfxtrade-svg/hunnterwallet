@@ -48,9 +48,10 @@ const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBh
 const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
 const supabaseSql = `
--- Create tokens table
+-- 1. Create tables if they don't exist
 CREATE TABLE IF NOT EXISTS tokens (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID DEFAULT auth.uid(),
   name TEXT NOT NULL,
   market_cap TEXT,
   liquidity TEXT,
@@ -65,9 +66,9 @@ CREATE TABLE IF NOT EXISTS tokens (
   notes TEXT
 );
 
--- Create wallets table
 CREATE TABLE IF NOT EXISTS wallets (
   id UUID DEFAULT gen_random_uuid() PRIMARY KEY,
+  user_id UUID DEFAULT auth.uid(),
   address TEXT NOT NULL,
   buy_volume TEXT,
   sell_volume TEXT,
@@ -84,6 +85,22 @@ CREATE TABLE IF NOT EXISTS wallets (
   is_favorite BOOLEAN DEFAULT FALSE,
   notes TEXT
 );
+
+-- 2. Enable Row Level Security (RLS)
+ALTER TABLE tokens ENABLE ROW LEVEL SECURITY;
+ALTER TABLE wallets ENABLE ROW LEVEL SECURITY;
+
+-- 3. Create Policies (Users can only see/edit their own data)
+-- Policy for Tokens
+CREATE POLICY "Users can all on own tokens" ON tokens
+  FOR ALL USING (auth.uid() = user_id);
+
+-- Policy for Wallets
+CREATE POLICY "Users can all on own wallets" ON wallets
+  FOR ALL USING (auth.uid() = user_id);
+  
+-- Note: If you have existing data without user_id, 
+-- you may need to manually assign them or truncate the tables.
 `;
 
 const formatMiladiDate = (dateStr: string) => {
@@ -282,11 +299,21 @@ export default function App() {
   }, [session]);
 
   const fetchData = async () => {
+    if (!session?.user?.id) return;
+    
     setIsLoading(true);
     try {
       const [{ data: tokensData }, { data: walletsData }] = await Promise.all([
-        supabase.from('tokens').select('*').order('date_added', { ascending: false }),
-        supabase.from('wallets').select('*').order('date_added', { ascending: false })
+        supabase
+          .from('tokens')
+          .select('*')
+          .eq('user_id', session.user.id) // Filter by User ID
+          .order('date_added', { ascending: false }),
+        supabase
+          .from('wallets')
+          .select('*')
+          .eq('user_id', session.user.id) // Filter by User ID
+          .order('date_added', { ascending: false })
       ]);
       if (tokensData) setCoins(tokensData.map(t => ({
         id: t.id, name: t.name, marketCap: t.market_cap, liquidity: t.liquidity, age: t.age, priceChange: t.price_change || '0%',
@@ -397,8 +424,10 @@ export default function App() {
   };
 
   const saveCoin = async () => {
-    if (!parsedCoinData || !parsedCoinData.name) return;
+    if (!parsedCoinData || !parsedCoinData.name || !session?.user?.id) return;
+    
     const payload = {
+      user_id: session.user.id, // Explicitly set user_id
       name: parsedCoinData.name, market_cap: parsedCoinData.marketCap || '$0', liquidity: parsedCoinData.liquidity || '$0',
       age: parsedCoinData.age || 'New', price_change: parsedCoinData.priceChange || '0%', network: parsedCoinData.network || Network.SOLANA,
       status: parsedCoinData.status || Status.GOOD, custom_link: parsedCoinData.customLink || '', 
@@ -412,8 +441,10 @@ export default function App() {
   };
 
   const saveWallet = async () => {
-    if (!newWallet.address) return;
+    if (!newWallet.address || !session?.user?.id) return;
+    
     const payload = {
+      user_id: session.user.id, // Explicitly set user_id
       address: newWallet.address, 
       buy_volume: newWallet.buyVolume, 
       sell_volume: newWallet.sellVolume, 
