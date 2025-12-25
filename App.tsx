@@ -29,13 +29,19 @@ import {
   Rocket,
   ShieldCheck,
   Award,
-  Hash
+  Hash,
+  Moon,
+  Sun,
+  Download,
+  Upload,
+  LogOut
 } from 'lucide-react';
-import { createClient } from '@supabase/supabase-js';
+import { createClient, Session } from '@supabase/supabase-js';
 import { Network, Coin, Wallet as WalletType, Status } from './types';
 import { parseDexScreenerData } from './services/geminiService';
 import { StatsCard } from './components/StatsCard';
 import { NetworkBadge, StatusBadge } from './components/Badge';
+import { Auth } from './components/Auth';
 
 const SUPABASE_URL = 'https://urimmfxmsamzwxsmtcxs.supabase.co';
 const SUPABASE_ANON_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVyaW1tZnhtc2Ftend4c210Y3hzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjY0MjQ0MjUsImV4cCI6MjA4MjAwMDQyNX0.N6mWD0R8QS8kJVwq9XmOoQl_qLxMHJsT2Pdz_Dnu0uE';
@@ -162,10 +168,10 @@ const Modal: React.FC<{ isOpen: boolean; onClose: () => void; title: string; chi
   if (!isOpen) return null;
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-900/50 backdrop-blur-sm">
-      <div className="bg-white rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh]">
-        <div className="flex justify-between items-center p-4 border-b border-slate-100 shrink-0">
-          <h3 className="font-semibold text-lg text-slate-900">{title}</h3>
-          <button onClick={onClose} className="text-slate-400 hover:text-slate-600"><X size={20} /></button>
+      <div className="bg-white dark:bg-dark-card rounded-2xl w-full max-w-2xl shadow-xl overflow-hidden animate-in fade-in zoom-in duration-200 flex flex-col max-h-[90vh] border border-slate-200 dark:border-dark-border">
+        <div className="flex justify-between items-center p-4 border-b border-slate-100 dark:border-dark-border shrink-0">
+          <h3 className="font-semibold text-lg text-slate-900 dark:text-white">{title}</h3>
+          <button onClick={onClose} className="text-slate-400 dark:text-slate-500 hover:text-slate-600 dark:hover:text-slate-300"><X size={20} /></button>
         </div>
         <div className="p-6 overflow-y-auto">{children}</div>
       </div>
@@ -180,10 +186,10 @@ const WinRateGauge: React.FC<{ rate: number }> = ({ rate }) => {
   return (
     <div className="relative flex items-center justify-center w-14 h-14">
       <svg className="w-full h-full transform -rotate-90">
-        <circle cx="28" cy="28" r={radius} stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-100" />
+        <circle cx="28" cy="28" r={radius} stroke="currentColor" strokeWidth="4" fill="transparent" className="text-slate-100 dark:text-slate-700" />
         <circle cx="28" cy="28" r={radius} stroke={getColor(rate)} strokeWidth="4" fill="transparent" strokeDasharray={circumference} strokeDashoffset={offset} strokeLinecap="round" className="transition-all duration-1000 ease-out" />
       </svg>
-      <span className="absolute text-[10px] font-bold text-slate-700">{rate}%</span>
+      <span className="absolute text-[10px] font-bold text-slate-700 dark:text-slate-200">{rate}%</span>
     </div>
   );
 };
@@ -192,9 +198,9 @@ const CopyButton: React.FC<{ text: string; label?: string; big?: boolean }> = ({
   const [copied, setCopied] = useState(false);
   const handleCopy = () => { navigator.clipboard.writeText(text); setCopied(true); setTimeout(() => setCopied(false), 2000); };
   return (
-    <button onClick={handleCopy} className={`flex items-center gap-1.5 p-1.5 rounded transition-all ${big ? 'bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 font-bold shadow-lg' : label ? 'bg-slate-100 hover:bg-slate-200 px-3' : 'hover:bg-slate-200 text-slate-400 hover:text-indigo-600'}`}>
+    <button onClick={handleCopy} className={`flex items-center gap-1.5 p-1.5 rounded transition-all ${big ? 'bg-indigo-600 hover:bg-indigo-700 text-white px-4 py-2 font-bold shadow-lg' : label ? 'bg-slate-100 hover:bg-slate-200 dark:bg-slate-800 dark:hover:bg-slate-700 px-3' : 'hover:bg-slate-200 dark:hover:bg-slate-700 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400'}`}>
       {copied ? <Check size={big ? 18 : 14} className={big ? "text-white" : "text-emerald-500"} /> : <Copy size={big ? 18 : 14} />}
-      {(label || (big && 'Copy SQL Code')) && <span className={`${big ? 'text-sm' : 'text-xs font-medium text-slate-600'}`}>{copied ? 'Copied!' : (label || 'Copy SQL Code')}</span>}
+      {(label || (big && 'Copy SQL Code')) && <span className={`${big ? 'text-sm' : 'text-xs font-medium text-slate-600 dark:text-slate-300'}`}>{copied ? 'Copied!' : (label || 'Copy SQL Code')}</span>}
     </button>
   );
 };
@@ -220,6 +226,7 @@ const INITIAL_WALLET_STATE: Partial<WalletType> = {
 };
 
 export default function App() {
+  const [session, setSession] = useState<Session | null>(null);
   const [activeTab, setActiveTab] = useState<'watchlist' | 'wallets'>('watchlist');
   const [searchQuery, setSearchQuery] = useState('');
   const [filterNetwork, setFilterNetwork] = useState<string>('All');
@@ -227,6 +234,7 @@ export default function App() {
   const [coins, setCoins] = useState<Coin[]>([]);
   const [wallets, setWallets] = useState<WalletType[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
   
   const [coinSort, setCoinSort] = useState<{ field: CoinSortField, direction: SortDirection }>({ field: 'dateAdded', direction: 'desc' });
   const [walletSort, setWalletSort] = useState<{ field: WalletSortField, direction: SortDirection }>({ field: 'dateAdded', direction: 'desc' });
@@ -243,7 +251,35 @@ export default function App() {
   const [rawWalletText, setRawWalletText] = useState('');
   const [newWallet, setNewWallet] = useState<Partial<WalletType>>(INITIAL_WALLET_STATE);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    // Check local theme preference
+    if (theme === 'dark') {
+      document.documentElement.classList.add('dark');
+    } else {
+      document.documentElement.classList.remove('dark');
+    }
+  }, [theme]);
+
+  useEffect(() => {
+    // Check for active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session);
+    });
+
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  useEffect(() => { 
+    if (session) {
+      fetchData(); 
+    }
+  }, [session]);
 
   const fetchData = async () => {
     setIsLoading(true);
@@ -263,6 +299,10 @@ export default function App() {
         winRate: w.win_rate || 50, customLink: w.custom_link, gmgnLink: w.gmgn_link, isFavorite: w.is_favorite || false, notes: w.notes || ''
       })));
     } catch (e) { console.error(e); } finally { setIsLoading(false); }
+  };
+
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
   };
 
   const toggleCoinFavorite = async (id: string, currentStatus: boolean) => {
@@ -429,22 +469,62 @@ export default function App() {
   const closeWalletModal = () => { setIsWalletModalOpen(false); setEditingWalletId(null); setNewWallet(INITIAL_WALLET_STATE); setRawWalletText(''); };
 
   const SortIndicator = ({ active, direction }: { active: boolean, direction: SortDirection }) => {
-    if (!active) return <ArrowUpDown size={14} className="ml-1 text-slate-300" />;
-    return direction === 'asc' ? <ChevronUp size={14} className="ml-1 text-indigo-600" /> : <ChevronDown size={14} className="ml-1 text-indigo-600" />;
+    if (!active) return <ArrowUpDown size={14} className="ml-1 text-slate-300 dark:text-slate-600" />;
+    return direction === 'asc' ? <ChevronUp size={14} className="ml-1 text-indigo-600 dark:text-indigo-400" /> : <ChevronDown size={14} className="ml-1 text-indigo-600 dark:text-indigo-400" />;
   };
 
   const DateSeparator = ({ dateStr }: { dateStr: string }) => (
     <div className="flex items-center gap-4 py-6 px-2">
-      <div className="flex-1 h-px bg-slate-200"></div>
-      <div className="bg-white border border-slate-200 px-4 py-1.5 rounded-full flex items-center gap-3 shadow-sm shrink-0">
-        <Calendar size={14} className="text-indigo-600" />
-        <span className="text-xs font-bold text-slate-700">{formatMiladiDate(dateStr)}</span>
-        <div className="w-px h-3 bg-slate-200"></div>
-        <span className="text-xs font-bold text-indigo-600" dir="rtl">{formatShamsiDate(dateStr)}</span>
+      <div className="flex-1 h-px bg-slate-200 dark:bg-dark-border"></div>
+      <div className="bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border px-4 py-1.5 rounded-full flex items-center gap-3 shadow-sm shrink-0">
+        <Calendar size={14} className="text-indigo-600 dark:text-indigo-400" />
+        <span className="text-xs font-bold text-slate-700 dark:text-slate-300">{formatMiladiDate(dateStr)}</span>
+        <div className="w-px h-3 bg-slate-200 dark:bg-dark-border"></div>
+        <span className="text-xs font-bold text-indigo-600 dark:text-indigo-400" dir="rtl">{formatShamsiDate(dateStr)}</span>
       </div>
-      <div className="flex-1 h-px bg-slate-200"></div>
+      <div className="flex-1 h-px bg-slate-200 dark:bg-dark-border"></div>
     </div>
   );
+
+  const handleExport = () => {
+    const data = {
+      tokens: coins,
+      wallets: wallets,
+      timestamp: new Date().toISOString()
+    };
+    const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `crypto-trackr-backup-${new Date().toISOString().split('T')[0]}.json`;
+    document.body.appendChild(a);
+    a.click();
+    document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+
+  const handleImport = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = async (event) => {
+      try {
+        const json = JSON.parse(event.target?.result as string);
+        if (json.tokens && Array.isArray(json.tokens)) {
+           setCoins(json.tokens);
+        }
+        if (json.wallets && Array.isArray(json.wallets)) {
+           setWallets(json.wallets);
+        }
+        alert('Backup loaded successfully! Note: This only updates the current view. To persist, ensure database connectivity.');
+      } catch (err) {
+        console.error(err);
+        alert('Invalid backup file');
+      }
+    };
+    reader.readAsText(file);
+  };
 
   // Stats Calculations (Separated per tab)
   const currentStats = useMemo(() => {
@@ -457,327 +537,369 @@ export default function App() {
     };
   }, [activeTab, coins, wallets]);
 
+  if (!session) {
+    return <Auth supabase={supabase} />;
+  }
+
   return (
-    <div className="h-screen w-full bg-slate-50 text-slate-900 flex flex-col md:flex-row font-sans overflow-hidden">
-      <aside className="w-full md:w-64 bg-white border-r border-slate-200 md:h-screen sticky top-0 z-10 shrink-0 flex flex-col">
-        <div className="p-6 border-b border-slate-100 flex items-center justify-between">
-          <h1 className="text-xl font-bold text-indigo-600 flex items-center gap-2"><Activity /> CryptoTrackr</h1>
-          <button onClick={() => setIsSqlModalOpen(true)} className="p-2 hover:bg-slate-100 rounded-lg text-slate-400 hover:text-indigo-600 transition-colors"><Database size={20} /></button>
-        </div>
-        <nav className="p-4 space-y-2 flex-1">
-          <button onClick={() => setActiveTab('watchlist')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium ${activeTab === 'watchlist' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}><List size={20} /> Watchlist</button>
-          <button onClick={() => setActiveTab('wallets')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium ${activeTab === 'wallets' ? 'bg-indigo-50 text-indigo-700' : 'text-slate-600 hover:bg-slate-50'}`}><Wallet size={20} /> Wallets</button>
-        </nav>
-      </aside>
-
-      <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto w-full h-full">
-        <div className="w-full">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
-            <StatsCard title={`TOTAL ${activeTab === 'watchlist' ? 'TOKENS' : 'WALLETS'}`} value={currentStats.total} icon={<Hash size={20} className="text-slate-500" />} />
-            <StatsCard title="GOOD" value={currentStats.good} icon={<ShieldCheck size={20} className="text-emerald-500" />} />
-            <StatsCard title="EXCELLENT" value={currentStats.excellent} icon={<Award size={20} className="text-indigo-500" />} />
-            <StatsCard title="Total Favorites" value={currentStats.favorites} icon={<Star size={20} className="text-amber-500 fill-amber-500" />} />
+    <div className="h-screen w-full bg-slate-50 dark:bg-dark-bg text-slate-900 dark:text-dark-text flex flex-col font-sans overflow-hidden transition-colors duration-200">
+      
+      {/* Top Header */}
+      <header className="flex items-center justify-between px-6 py-3 bg-white dark:bg-dark-card border-b border-slate-200 dark:border-dark-border shrink-0 z-30 shadow-sm dark:shadow-none">
+        <div className="flex items-center gap-3">
+          <div className="bg-indigo-600 dark:bg-indigo-500 p-2 rounded-lg text-white shadow-lg shadow-indigo-200 dark:shadow-none">
+            <Activity size={20} />
           </div>
+          <h1 className="text-xl font-bold text-slate-800 dark:text-white tracking-tight">CryptoTrackr</h1>
+        </div>
+        
+        <div className="flex items-center gap-1 bg-slate-50 dark:bg-dark-bg p-1 rounded-xl border border-slate-100 dark:border-dark-border">
+          <button onClick={handleExport} className="p-2 hover:bg-white dark:hover:bg-dark-card hover:shadow-sm rounded-lg text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-all" title="Backup Data">
+            <Download size={18} />
+          </button>
+          <label className="p-2 hover:bg-white dark:hover:bg-dark-card hover:shadow-sm rounded-lg text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-all cursor-pointer" title="Restore Data">
+            <Upload size={18} />
+            <input type="file" accept=".json" className="hidden" onChange={handleImport} />
+          </label>
+          <div className="w-px h-6 bg-slate-200 dark:bg-dark-border mx-1"></div>
+          <button onClick={() => setIsSqlModalOpen(true)} className="p-2 hover:bg-white dark:hover:bg-dark-card hover:shadow-sm rounded-lg text-slate-500 hover:text-indigo-600 dark:text-slate-400 dark:hover:text-indigo-400 transition-all" title="Database Config">
+            <Database size={18} />
+          </button>
+        </div>
+      </header>
 
-          <div className="bg-white p-4 rounded-xl shadow-sm border border-slate-200 mb-6 flex flex-col md:flex-row gap-4 items-center justify-between">
-            <div className="flex flex-1 gap-4 w-full md:w-auto">
-              <div className="relative flex-1 md:flex-none md:min-w-[300px]">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
-                <input type="text" placeholder="Search tokens, wallets, or notes..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-slate-200 rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
-              </div>
-              <select value={filterNetwork} onChange={e=>setFilterNetwork(e.target.value)} className="px-3 py-2 border border-slate-200 rounded-lg text-sm outline-none bg-white">
-                <option value="All">All Networks</option>
-                {Object.values(Network).map(n => <option key={n} value={n}>{n}</option>)}
-              </select>
-              <button 
-                onClick={() => setFilterOnlyFavorites(!filterOnlyFavorites)} 
-                className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-all ${filterOnlyFavorites ? 'bg-amber-50 border-amber-200 text-amber-700' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
-              >
-                <Star size={16} className={filterOnlyFavorites ? "fill-amber-500" : ""} />
-                Only Favorites
-              </button>
-            </div>
-            <button onClick={() => activeTab === 'watchlist' ? setIsCoinModalOpen(true) : setIsWalletModalOpen(true)} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 text-white px-6 py-2 rounded-lg font-bold transition-all shadow-md">
-              <Plus size={18} /> Add {activeTab === 'watchlist' ? 'Token' : 'Wallet'}
+      <div className="flex flex-1 overflow-hidden flex-col md:flex-row">
+        <aside className="w-full md:w-64 bg-white dark:bg-dark-card border-r border-slate-200 dark:border-dark-border shrink-0 flex flex-col transition-colors z-20">
+          <nav className="p-4 space-y-2 flex-1 mt-2">
+            <button onClick={() => setActiveTab('watchlist')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'watchlist' ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-dark-hover'}`}><List size={20} /> Watchlist</button>
+            <button onClick={() => setActiveTab('wallets')} className={`w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium transition-colors ${activeTab === 'wallets' ? 'bg-indigo-50 dark:bg-indigo-900/20 text-indigo-700 dark:text-indigo-300' : 'text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-dark-hover'}`}><Wallet size={20} /> Wallets</button>
+          </nav>
+          <div className="p-4 border-t border-slate-100 dark:border-dark-border space-y-2">
+            <button 
+              onClick={() => setTheme(theme === 'dark' ? 'light' : 'dark')} 
+              className="w-full flex items-center justify-between px-4 py-3 rounded-lg text-sm font-medium text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-dark-hover transition-colors"
+            >
+              <span className="flex items-center gap-3">{theme === 'dark' ? <Moon size={20} /> : <Sun size={20} />} Theme</span>
+              <span className="text-xs uppercase font-bold tracking-wider">{theme}</span>
+            </button>
+            <button 
+              onClick={handleLogout}
+              className="w-full flex items-center gap-3 px-4 py-3 rounded-lg text-sm font-medium text-rose-600 dark:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/10 transition-colors"
+            >
+              <LogOut size={20} /> Sign Out
             </button>
           </div>
+        </aside>
 
-          {activeTab === 'watchlist' ? (
-            <div className="bg-white rounded-xl shadow-sm border border-slate-200 overflow-hidden">
-              <div className="overflow-x-auto">
-                <table className="w-full text-left text-sm border-collapse">
-                  <thead className="bg-slate-50 border-b border-slate-200">
-                    <tr>
-                      <th className="px-6 py-4 font-bold w-12 text-center">Fav</th>
-                      <th className="px-6 py-4 font-bold">Token</th>
-                      <th className="px-6 py-4 font-bold">Network</th>
-                      <th className="px-6 py-4 font-bold cursor-pointer hover:text-indigo-600 select-none transition-colors" onClick={() => handleCoinSort('priceChange')}>
-                        <div className="flex items-center">24h Change <SortIndicator active={coinSort.field === 'priceChange'} direction={coinSort.direction} /></div>
-                      </th>
-                      <th className="px-6 py-4 font-bold cursor-pointer hover:text-indigo-600 select-none transition-colors" onClick={() => handleCoinSort('marketCap')}>
-                        <div className="flex items-center">Market Cap <SortIndicator active={coinSort.field === 'marketCap'} direction={coinSort.direction} /></div>
-                      </th>
-                      <th className="px-6 py-4 font-bold cursor-pointer hover:text-indigo-600 select-none transition-colors" onClick={() => handleCoinSort('dateAdded')}>
-                        <div className="flex items-center">Date Added <SortIndicator active={coinSort.field === 'dateAdded'} direction={coinSort.direction} /></div>
-                      </th>
-                      <th className="px-6 py-4 font-bold">Age</th>
-                      <th className="px-6 py-4 font-bold">Status</th>
-                      <th className="px-6 py-4 text-right font-bold">Actions</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-slate-100">
-                    {filteredCoins.map((coin, index) => {
-                      const prevCoin = filteredCoins[index - 1];
-                      const currentDateKey = getDateKey(coin.dateAdded);
-                      const prevDateKey = prevCoin ? getDateKey(prevCoin.dateAdded) : null;
-                      const showDivider = currentDateKey !== prevDateKey;
-                      const linkUrl = ensureValidUrl(coin.dexScreenerUrl || coin.customLink);
+        <main className="flex-1 p-4 md:p-6 lg:p-8 overflow-y-auto w-full h-full">
+          <div className="w-full">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+              <StatsCard title={`TOTAL ${activeTab === 'watchlist' ? 'TOKENS' : 'WALLETS'}`} value={currentStats.total} icon={<Hash size={20} className="text-slate-500 dark:text-slate-400" />} />
+              <StatsCard title="GOOD" value={currentStats.good} icon={<ShieldCheck size={20} className="text-emerald-500 dark:text-emerald-400" />} />
+              <StatsCard title="EXCELLENT" value={currentStats.excellent} icon={<Award size={20} className="text-indigo-500 dark:text-indigo-400" />} />
+              <StatsCard title="Total Favorites" value={currentStats.favorites} icon={<Star size={20} className="text-amber-500 fill-amber-500" />} />
+            </div>
 
-                      return (
-                        <React.Fragment key={coin.id}>
-                          {showDivider && (
-                            <tr className="bg-slate-50/50">
-                              <td colSpan={9} className="p-0">
-                                <DateSeparator dateStr={coin.dateAdded} />
+            <div className="bg-white dark:bg-dark-card p-4 rounded-xl shadow-sm border border-slate-200 dark:border-dark-border mb-6 flex flex-col md:flex-row gap-4 items-center justify-between transition-colors">
+              <div className="flex flex-1 gap-4 w-full md:w-auto">
+                <div className="relative flex-1 md:flex-none md:min-w-[300px]">
+                  <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500" size={18} />
+                  <input type="text" placeholder="Search tokens, wallets, or notes..." value={searchQuery} onChange={e=>setSearchQuery(e.target.value)} className="w-full pl-10 pr-4 py-2 border border-slate-200 dark:border-dark-border bg-white dark:bg-dark-bg rounded-lg text-sm outline-none focus:ring-2 focus:ring-indigo-500 dark:text-white placeholder-slate-400 dark:placeholder-slate-600" />
+                </div>
+                <select value={filterNetwork} onChange={e=>setFilterNetwork(e.target.value)} className="px-3 py-2 border border-slate-200 dark:border-dark-border rounded-lg text-sm outline-none bg-white dark:bg-dark-bg text-slate-900 dark:text-white">
+                  <option value="All">All Networks</option>
+                  {Object.values(Network).map(n => <option key={n} value={n}>{n}</option>)}
+                </select>
+                <button 
+                  onClick={() => setFilterOnlyFavorites(!filterOnlyFavorites)} 
+                  className={`flex items-center gap-2 px-4 py-2 border rounded-lg text-sm transition-all ${filterOnlyFavorites ? 'bg-amber-50 dark:bg-amber-900/20 border-amber-200 dark:border-amber-800 text-amber-700 dark:text-amber-400' : 'bg-white dark:bg-dark-bg border-slate-200 dark:border-dark-border text-slate-600 dark:text-slate-400 hover:bg-slate-50 dark:hover:bg-dark-hover'}`}
+                >
+                  <Star size={16} className={filterOnlyFavorites ? "fill-amber-500" : ""} />
+                  Only Favorites
+                </button>
+              </div>
+              <button onClick={() => activeTab === 'watchlist' ? setIsCoinModalOpen(true) : setIsWalletModalOpen(true)} className="flex items-center gap-2 bg-indigo-600 hover:bg-indigo-700 dark:bg-indigo-600 dark:hover:bg-indigo-500 text-white px-6 py-2 rounded-lg font-bold transition-all shadow-md">
+                <Plus size={18} /> Add {activeTab === 'watchlist' ? 'Token' : 'Wallet'}
+              </button>
+            </div>
+
+            {activeTab === 'watchlist' ? (
+              <div className="bg-white dark:bg-dark-card rounded-xl shadow-sm border border-slate-200 dark:border-dark-border overflow-hidden transition-colors">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-sm border-collapse">
+                    <thead className="bg-slate-50 dark:bg-dark-card/50 border-b border-slate-200 dark:border-dark-border">
+                      <tr>
+                        <th className="px-6 py-4 font-bold w-12 text-center text-slate-700 dark:text-slate-300">Fav</th>
+                        <th className="px-6 py-4 font-bold text-slate-700 dark:text-slate-300">Token</th>
+                        <th className="px-6 py-4 font-bold text-slate-700 dark:text-slate-300">Network</th>
+                        <th className="px-6 py-4 font-bold cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 select-none transition-colors text-slate-700 dark:text-slate-300" onClick={() => handleCoinSort('priceChange')}>
+                          <div className="flex items-center">24h Change <SortIndicator active={coinSort.field === 'priceChange'} direction={coinSort.direction} /></div>
+                        </th>
+                        <th className="px-6 py-4 font-bold cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 select-none transition-colors text-slate-700 dark:text-slate-300" onClick={() => handleCoinSort('marketCap')}>
+                          <div className="flex items-center">Market Cap <SortIndicator active={coinSort.field === 'marketCap'} direction={coinSort.direction} /></div>
+                        </th>
+                        <th className="px-6 py-4 font-bold cursor-pointer hover:text-indigo-600 dark:hover:text-indigo-400 select-none transition-colors text-slate-700 dark:text-slate-300" onClick={() => handleCoinSort('dateAdded')}>
+                          <div className="flex items-center">Date Added <SortIndicator active={coinSort.field === 'dateAdded'} direction={coinSort.direction} /></div>
+                        </th>
+                        <th className="px-6 py-4 font-bold text-slate-700 dark:text-slate-300">Age</th>
+                        <th className="px-6 py-4 font-bold text-slate-700 dark:text-slate-300">Status</th>
+                        <th className="px-6 py-4 text-right font-bold text-slate-700 dark:text-slate-300">Actions</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-slate-100 dark:divide-dark-border">
+                      {filteredCoins.map((coin, index) => {
+                        const prevCoin = filteredCoins[index - 1];
+                        const currentDateKey = getDateKey(coin.dateAdded);
+                        const prevDateKey = prevCoin ? getDateKey(prevCoin.dateAdded) : null;
+                        const showDivider = currentDateKey !== prevDateKey;
+                        const linkUrl = ensureValidUrl(coin.dexScreenerUrl || coin.customLink);
+
+                        return (
+                          <React.Fragment key={coin.id}>
+                            {showDivider && (
+                              <tr className="bg-slate-50/50 dark:bg-dark-bg/50">
+                                <td colSpan={9} className="p-0">
+                                  <DateSeparator dateStr={coin.dateAdded} />
+                                </td>
+                              </tr>
+                            )}
+                            <tr className="hover:bg-slate-50 dark:hover:bg-dark-hover transition-colors">
+                              <td className="px-6 py-4 text-center">
+                                <button onClick={() => toggleCoinFavorite(coin.id, !!coin.isFavorite)} className="transition-colors group">
+                                  <Star size={18} className={`${coin.isFavorite ? 'text-amber-500 fill-amber-500' : 'text-slate-200 dark:text-slate-700 group-hover:text-amber-400'}`} />
+                                </button>
+                              </td>
+                              <td className="px-6 py-4">
+                                <div className="flex flex-col">
+                                  {linkUrl ? (
+                                    <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 dark:text-indigo-400 font-bold hover:underline flex items-center gap-1.5 transition-colors">
+                                      {coin.name} <ExternalLink size={12} className="shrink-0" />
+                                    </a>
+                                  ) : (
+                                    <span className="text-slate-900 dark:text-white font-bold">{coin.name}</span>
+                                  )}
+                                  {coin.notes && (
+                                    <div className="flex items-center gap-1 mt-1 text-slate-400 dark:text-slate-500 text-xs italic truncate max-w-[150px]" title={coin.notes}>
+                                      <StickyNote size={10} /> {coin.notes}
+                                    </div>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-6 py-4"><NetworkBadge network={coin.network} /></td>
+                              <td className={`px-6 py-4 font-bold ${coin.priceChange.startsWith('+') ? 'text-emerald-600 dark:text-emerald-400' : coin.priceChange.startsWith('-') ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500 dark:text-slate-400'}`}>{coin.priceChange}</td>
+                              <td className="px-6 py-4 text-slate-600 dark:text-slate-300 font-medium">{coin.marketCap}</td>
+                              <td className="px-6 py-4 whitespace-nowrap">
+                                <div className="flex flex-col">
+                                  <span className="text-xs font-semibold text-slate-700 dark:text-slate-300" title="Miladi Date">{formatMiladiDate(coin.dateAdded)}</span>
+                                  <span className="text-[10px] text-slate-400 dark:text-slate-500 font-medium" title="Shamsi Date">{formatShamsiDate(coin.dateAdded)}</span>
+                                </div>
+                              </td>
+                              <td className="px-6 py-4 text-slate-500 dark:text-slate-400 font-medium">{coin.age}</td>
+                              <td className="px-6 py-4"><StatusBadge status={coin.status} /></td>
+                              <td className="px-6 py-4 text-right">
+                                <div className="flex items-center justify-end gap-2">
+                                  <button onClick={() => { setEditingCoinId(coin.id); setParsedCoinData(coin); setIsCoinModalOpen(true); setIsManualCoinEntry(true); }} className="p-2 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors" title="Edit Token"><Pencil size={16} /></button>
+                                  <button onClick={() => deleteCoin(coin.id)} className="p-2 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 transition-colors" title="Delete Token"><Trash2 size={16} /></button>
+                                </div>
                               </td>
                             </tr>
-                          )}
-                          <tr className="hover:bg-slate-50 transition-colors">
-                            <td className="px-6 py-4 text-center">
-                              <button onClick={() => toggleCoinFavorite(coin.id, !!coin.isFavorite)} className="transition-colors group">
-                                <Star size={18} className={`${coin.isFavorite ? 'text-amber-500 fill-amber-500' : 'text-slate-200 group-hover:text-amber-400'}`} />
+                          </React.Fragment>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                  {filteredCoins.length === 0 && !isLoading && (
+                    <div className="p-12 text-center text-slate-400 dark:text-slate-600 flex flex-col items-center gap-3">
+                      <Search size={48} className="text-slate-200 dark:text-slate-700" />
+                      <p>No tokens found matching your criteria.</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="space-y-4">
+                <div className="flex items-center justify-end gap-4 px-2 py-1 bg-slate-100 dark:bg-dark-card border border-transparent dark:border-dark-border rounded-lg text-xs font-bold text-slate-500 dark:text-slate-400 mb-2 shadow-sm">
+                  <span>Sort By:</span>
+                  <button onClick={() => handleWalletSort('dateAdded')} className={`flex items-center gap-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors ${walletSort.field === 'dateAdded' ? 'text-indigo-600 dark:text-indigo-400' : ''}`}>Date <SortIndicator active={walletSort.field === 'dateAdded'} direction={walletSort.direction} /></button>
+                  <button onClick={() => handleWalletSort('winRate')} className={`flex items-center gap-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors ${walletSort.field === 'winRate' ? 'text-indigo-600 dark:text-indigo-400' : ''}`}>Win Rate <SortIndicator active={walletSort.field === 'winRate'} direction={walletSort.direction} /></button>
+                  <button onClick={() => handleWalletSort('multiplier')} className={`flex items-center gap-1 hover:text-indigo-600 dark:hover:text-indigo-400 transition-colors ${walletSort.field === 'multiplier' ? 'text-indigo-600 dark:text-indigo-400' : ''}`}>Multiplier <SortIndicator active={walletSort.field === 'multiplier'} direction={walletSort.direction} /></button>
+                </div>
+                {filteredWallets.map((wallet, index) => {
+                  const prevWallet = filteredWallets[index - 1];
+                  const currentDateKey = getDateKey(wallet.dateAdded);
+                  const prevDateKey = prevWallet ? getDateKey(prevWallet.dateAdded) : null;
+                  const showDivider = currentDateKey !== prevDateKey;
+                  const linkUrl = ensureValidUrl(wallet.customLink);
+                  const gmgnUrl = ensureValidUrl(wallet.gmgnLink);
+
+                  return (
+                    <React.Fragment key={wallet.id}>
+                      {showDivider && <DateSeparator dateStr={wallet.dateAdded} />}
+                      <div className={`bg-white dark:bg-dark-card p-6 rounded-xl shadow-sm border transition-all hover:shadow-md dark:shadow-none dark:hover:bg-dark-hover ${wallet.isFavorite ? 'border-amber-200 ring-1 ring-amber-100 dark:border-amber-900/50 dark:ring-amber-900/20' : 'border-slate-200 dark:border-dark-border'}`}>
+                        <div className="flex flex-col lg:flex-row justify-between gap-6">
+                          <div className="flex-1">
+                            <div className="flex items-center gap-3 mb-4 flex-wrap">
+                              <button onClick={() => toggleWalletFavorite(wallet.id, !!wallet.isFavorite)} className="transition-colors">
+                                <Star size={20} className={`${wallet.isFavorite ? 'text-amber-500 fill-amber-500' : 'text-slate-200 dark:text-slate-700 hover:text-amber-400'}`} />
                               </button>
-                            </td>
-                            <td className="px-6 py-4">
-                              <div className="flex flex-col">
-                                {linkUrl ? (
-                                  <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="text-indigo-600 font-bold hover:underline flex items-center gap-1.5 transition-colors">
-                                    {coin.name} <ExternalLink size={12} className="shrink-0" />
-                                  </a>
-                                ) : (
-                                  <span className="text-slate-900 font-bold">{coin.name}</span>
-                                )}
-                                {coin.notes && (
-                                  <div className="flex items-center gap-1 mt-1 text-slate-400 text-xs italic truncate max-w-[150px]" title={coin.notes}>
-                                    <StickyNote size={10} /> {coin.notes}
-                                  </div>
-                                )}
-                              </div>
-                            </td>
-                            <td className="px-6 py-4"><NetworkBadge network={coin.network} /></td>
-                            <td className={`px-6 py-4 font-bold ${coin.priceChange.startsWith('+') ? 'text-emerald-600' : coin.priceChange.startsWith('-') ? 'text-rose-600' : 'text-slate-500'}`}>{coin.priceChange}</td>
-                            <td className="px-6 py-4 text-slate-600 font-medium">{coin.marketCap}</td>
-                            <td className="px-6 py-4 whitespace-nowrap">
-                              <div className="flex flex-col">
-                                <span className="text-xs font-semibold text-slate-700" title="Miladi Date">{formatMiladiDate(coin.dateAdded)}</span>
-                                <span className="text-[10px] text-slate-400 font-medium" title="Shamsi Date">{formatShamsiDate(coin.dateAdded)}</span>
-                              </div>
-                            </td>
-                            <td className="px-6 py-4 text-slate-500 font-medium">{coin.age}</td>
-                            <td className="px-6 py-4"><StatusBadge status={coin.status} /></td>
-                            <td className="px-6 py-4 text-right">
-                              <div className="flex items-center justify-end gap-2">
-                                <button onClick={() => { setEditingCoinId(coin.id); setParsedCoinData(coin); setIsCoinModalOpen(true); setIsManualCoinEntry(true); }} className="p-2 text-slate-400 hover:text-indigo-600 transition-colors" title="Edit Token"><Pencil size={16} /></button>
-                                <button onClick={() => deleteCoin(coin.id)} className="p-2 text-slate-400 hover:text-rose-600 transition-colors" title="Delete Token"><Trash2 size={16} /></button>
-                              </div>
-                            </td>
-                          </tr>
-                        </React.Fragment>
-                      );
-                    })}
-                  </tbody>
-                </table>
-                {filteredCoins.length === 0 && !isLoading && (
-                  <div className="p-12 text-center text-slate-400 flex flex-col items-center gap-3">
-                    <Search size={48} className="text-slate-200" />
-                    <p>No tokens found matching your criteria.</p>
-                  </div>
-                )}
-              </div>
-            </div>
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-end gap-4 px-2 py-1 bg-slate-100 rounded-lg text-xs font-bold text-slate-500 mb-2 shadow-sm">
-                <span>Sort By:</span>
-                <button onClick={() => handleWalletSort('dateAdded')} className={`flex items-center gap-1 hover:text-indigo-600 transition-colors ${walletSort.field === 'dateAdded' ? 'text-indigo-600' : ''}`}>Date <SortIndicator active={walletSort.field === 'dateAdded'} direction={walletSort.direction} /></button>
-                <button onClick={() => handleWalletSort('winRate')} className={`flex items-center gap-1 hover:text-indigo-600 transition-colors ${walletSort.field === 'winRate' ? 'text-indigo-600' : ''}`}>Win Rate <SortIndicator active={walletSort.field === 'winRate'} direction={walletSort.direction} /></button>
-                <button onClick={() => handleWalletSort('multiplier')} className={`flex items-center gap-1 hover:text-indigo-600 transition-colors ${walletSort.field === 'multiplier' ? 'text-indigo-600' : ''}`}>Multiplier <SortIndicator active={walletSort.field === 'multiplier'} direction={walletSort.direction} /></button>
-              </div>
-              {filteredWallets.map((wallet, index) => {
-                const prevWallet = filteredWallets[index - 1];
-                const currentDateKey = getDateKey(wallet.dateAdded);
-                const prevDateKey = prevWallet ? getDateKey(prevWallet.dateAdded) : null;
-                const showDivider = currentDateKey !== prevDateKey;
-                const linkUrl = ensureValidUrl(wallet.customLink);
-                const gmgnUrl = ensureValidUrl(wallet.gmgnLink);
-
-                return (
-                  <React.Fragment key={wallet.id}>
-                    {showDivider && <DateSeparator dateStr={wallet.dateAdded} />}
-                    <div className={`bg-white p-6 rounded-xl shadow-sm border transition-all hover:shadow-md ${wallet.isFavorite ? 'border-amber-200 ring-1 ring-amber-100' : 'border-slate-200'}`}>
-                      <div className="flex flex-col lg:flex-row justify-between gap-6">
-                        <div className="flex-1">
-                          <div className="flex items-center gap-3 mb-4 flex-wrap">
-                            <button onClick={() => toggleWalletFavorite(wallet.id, !!wallet.isFavorite)} className="transition-colors">
-                              <Star size={20} className={`${wallet.isFavorite ? 'text-amber-500 fill-amber-500' : 'text-slate-200 hover:text-amber-400'}`} />
-                            </button>
-                            <NetworkBadge network={wallet.network} />
-                            {linkUrl ? (
-                              <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-indigo-600 hover:underline flex items-center gap-1 transition-colors">
-                                {wallet.source} <ExternalLink size={12} />
-                              </a>
-                            ) : (
-                              <span className="font-bold text-slate-700">{wallet.source}</span>
-                            )}
-                            <span className="font-mono text-slate-400 text-[10px] bg-slate-50 px-2 py-1 rounded border border-slate-100">{wallet.address}</span>
-                            <CopyButton text={wallet.address} />
-                            <StatusBadge status={wallet.status} />
-                          </div>
-                          <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-4">
-                            <div><span className="text-[10px] uppercase font-bold text-slate-400 block mb-1 tracking-wider">Buy Vol</span><span className="font-bold text-blue-600">{wallet.buyVolume || '$0'}</span></div>
-                            <div><span className="text-[10px] uppercase font-bold text-slate-400 block mb-1 tracking-wider">Sell Vol</span><span className="font-bold text-rose-600">{wallet.sellVolume || '$0'}</span></div>
-                            <div><span className="text-[10px] uppercase font-bold text-slate-400 block mb-1 tracking-wider">Profit</span><span className={`font-extrabold text-lg ${wallet.profit.startsWith('+') ? 'text-emerald-600' : 'text-rose-600'}`}>{wallet.profit || '$0'}</span></div>
-                            <div><span className="text-[10px] uppercase font-bold text-slate-400 block mb-1 tracking-wider">Mult.</span><span className="font-extrabold text-indigo-600">{wallet.multiplier}</span></div>
-                          </div>
-                          
-                          {wallet.notes && (
-                            <div className="bg-slate-50 p-3 rounded-lg border border-slate-100 mb-4">
-                               <p className="text-xs text-slate-600 flex gap-2"><StickyNote size={14} className="text-indigo-400 shrink-0" /> {wallet.notes}</p>
+                              <NetworkBadge network={wallet.network} />
+                              {linkUrl ? (
+                                <a href={linkUrl} target="_blank" rel="noopener noreferrer" className="font-bold text-indigo-600 dark:text-indigo-400 hover:underline flex items-center gap-1 transition-colors">
+                                  {wallet.source} <ExternalLink size={12} />
+                                </a>
+                              ) : (
+                                <span className="font-bold text-slate-700 dark:text-white">{wallet.source}</span>
+                              )}
+                              <span className="font-mono text-slate-400 dark:text-slate-500 text-[10px] bg-slate-50 dark:bg-dark-bg px-2 py-1 rounded border border-slate-100 dark:border-dark-border">{wallet.address}</span>
+                              <CopyButton text={wallet.address} />
+                              <StatusBadge status={wallet.status} />
                             </div>
-                          )}
-
-                          <div className="flex gap-4 text-[10px] text-slate-400 font-bold border-t border-slate-50 pt-3">
-                             <div className="flex items-center gap-1"><Calendar size={12} /> {formatMiladiDate(wallet.dateAdded)} / {formatShamsiDate(wallet.dateAdded)}</div>
-                          </div>
-                        </div>
-                        <div className="flex items-center gap-6 border-t lg:border-t-0 lg:border-l border-slate-100 pt-4 lg:pt-0 pl-0 lg:pl-8 shrink-0">
-                           <div className="flex items-center gap-4">
-                             <div className="text-right"><span className="text-[10px] uppercase font-bold text-slate-400 block tracking-wider">Win Rate</span><span className="font-bold text-slate-700">Performance</span></div>
-                             <WinRateGauge rate={wallet.winRate} />
-                           </div>
-                           <div className="flex gap-2">
-                            {gmgnUrl && (
-                              <a 
-                                href={gmgnUrl} 
-                                target="_blank" 
-                                rel="noopener noreferrer" 
-                                className="p-3 text-emerald-500 hover:text-emerald-700 hover:bg-emerald-50 rounded-xl transition-all"
-                                title="Open GMGN"
-                              >
-                                <Rocket size={20} />
-                              </a>
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-6 mb-4">
+                              <div><span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-1 tracking-wider">Buy Vol</span><span className="font-bold text-blue-600 dark:text-blue-400">{wallet.buyVolume || '$0'}</span></div>
+                              <div><span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-1 tracking-wider">Sell Vol</span><span className="font-bold text-rose-600 dark:text-rose-400">{wallet.sellVolume || '$0'}</span></div>
+                              <div><span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-1 tracking-wider">Profit</span><span className={`font-extrabold text-lg ${wallet.profit.startsWith('+') ? 'text-emerald-600 dark:text-emerald-400' : 'text-rose-600 dark:text-rose-400'}`}>{wallet.profit || '$0'}</span></div>
+                              <div><span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block mb-1 tracking-wider">Mult.</span><span className="font-extrabold text-indigo-600 dark:text-indigo-400">{wallet.multiplier}</span></div>
+                            </div>
+                            
+                            {wallet.notes && (
+                              <div className="bg-slate-50 dark:bg-dark-bg p-3 rounded-lg border border-slate-100 dark:border-dark-border mb-4">
+                                 <p className="text-xs text-slate-600 dark:text-slate-400 flex gap-2"><StickyNote size={14} className="text-indigo-400 shrink-0" /> {wallet.notes}</p>
+                              </div>
                             )}
-                            <button onClick={() => { setEditingWalletId(wallet.id); setNewWallet({ ...wallet }); setIsWalletModalOpen(true); }} className="p-3 text-slate-400 hover:text-indigo-600 hover:bg-indigo-50 rounded-xl transition-all" title="Edit Wallet"><Pencil size={20} /></button>
-                            <button onClick={() => deleteWallet(wallet.id)} className="p-3 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-xl transition-all" title="Delete Wallet"><Trash2 size={20} /></button>
-                           </div>
+
+                            <div className="flex gap-4 text-[10px] text-slate-400 dark:text-slate-500 font-bold border-t border-slate-50 dark:border-dark-border pt-3">
+                               <div className="flex items-center gap-1"><Calendar size={12} /> {formatMiladiDate(wallet.dateAdded)} / {formatShamsiDate(wallet.dateAdded)}</div>
+                            </div>
+                          </div>
+                          <div className="flex items-center gap-6 border-t lg:border-t-0 lg:border-l border-slate-100 dark:border-dark-border pt-4 lg:pt-0 pl-0 lg:pl-8 shrink-0">
+                             <div className="flex items-center gap-4">
+                               <div className="text-right"><span className="text-[10px] uppercase font-bold text-slate-400 dark:text-slate-500 block tracking-wider">Win Rate</span><span className="font-bold text-slate-700 dark:text-slate-300">Performance</span></div>
+                               <WinRateGauge rate={wallet.winRate} />
+                             </div>
+                             <div className="flex gap-2">
+                              {gmgnUrl && (
+                                <a 
+                                  href={gmgnUrl} 
+                                  target="_blank" 
+                                  rel="noopener noreferrer" 
+                                  className="p-3 text-emerald-500 hover:text-emerald-400 hover:bg-emerald-50 dark:hover:bg-emerald-900/20 rounded-xl transition-all"
+                                  title="Open GMGN"
+                                >
+                                  <Rocket size={20} />
+                                </a>
+                              )}
+                              <button onClick={() => { setEditingWalletId(wallet.id); setNewWallet({ ...wallet }); setIsWalletModalOpen(true); }} className="p-3 text-slate-400 hover:text-indigo-600 dark:hover:text-indigo-400 hover:bg-indigo-50 dark:hover:bg-indigo-900/20 rounded-xl transition-all" title="Edit Wallet"><Pencil size={20} /></button>
+                              <button onClick={() => deleteWallet(wallet.id)} className="p-3 text-slate-400 hover:text-rose-600 dark:hover:text-rose-400 hover:bg-rose-50 dark:hover:bg-rose-900/20 rounded-xl transition-all" title="Delete Wallet"><Trash2 size={20} /></button>
+                             </div>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  </React.Fragment>
-                );
-              })}
-              {filteredWallets.length === 0 && !isLoading && (
-                 <div className="p-12 text-center text-slate-400 flex flex-col items-center gap-3 bg-white border border-slate-200 rounded-xl">
-                    <Wallet size={48} className="text-slate-200" />
-                    <p>No wallets found matching your criteria.</p>
-                 </div>
-              )}
-            </div>
-          )}
-        </div>
-      </main>
-
-      <Modal isOpen={isSqlModalOpen} onClose={() => setIsSqlModalOpen(false)} title="Supabase Database Setup">
-        <div className="space-y-4">
-          <div className="flex items-center gap-3 p-4 bg-amber-50 border border-amber-200 rounded-xl text-amber-800">
-            <Info size={24} className="shrink-0" /><p className="text-sm">Copy the code below and paste it into the <b>SQL Editor</b> in Supabase.</p>
+                    </React.Fragment>
+                  );
+                })}
+                {filteredWallets.length === 0 && !isLoading && (
+                   <div className="p-12 text-center text-slate-400 dark:text-slate-600 flex flex-col items-center gap-3 bg-white dark:bg-dark-card border border-slate-200 dark:border-dark-border rounded-xl">
+                      <Wallet size={48} className="text-slate-200 dark:text-slate-700" />
+                      <p>No wallets found matching your criteria.</p>
+                   </div>
+                )}
+              </div>
+            )}
           </div>
-          <div className="relative group">
-            <div className="absolute right-4 top-4 z-10"><CopyButton text={supabaseSql} big /></div>
-            <div className="bg-slate-900 rounded-xl p-6 overflow-hidden"><pre className="text-indigo-300 text-[13px] font-mono h-64 overflow-auto select-all">{supabaseSql}</pre></div>
-          </div>
-        </div>
-      </Modal>
+        </main>
 
-      <Modal isOpen={isCoinModalOpen} onClose={closeCoinModal} title={editingCoinId ? "Edit Token" : "Add Token"}>
-        <div className="space-y-4">
-          {!editingCoinId && !isManualCoinEntry && (
-            <div className="flex flex-col gap-4">
-               <div className="flex gap-2">
-                <input type="text" value={newCoinUrl} onChange={e=>setNewCoinUrl(e.target.value)} placeholder="DexScreener URL or Symbol..." className="flex-1 p-3 border border-slate-300 rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" />
-                <button onClick={handleParseCoin} disabled={isParsingCoin} className="bg-indigo-600 text-white px-4 py-3 rounded-lg flex items-center justify-center min-w-[60px]">{isParsingCoin ? <Loader2 className="animate-spin" /> : <Search />}</button>
-              </div>
-              <button onClick={() => { setIsManualCoinEntry(true); setParsedCoinData({ name: '', marketCap: '', liquidity: '', age: 'New', priceChange: '0%', network: Network.SOLANA, status: Status.GOOD, dexScreenerUrl: '', isFavorite: false, notes: '' }); }} className="text-indigo-600 text-sm font-bold flex items-center justify-center gap-1 hover:underline"><Pencil size={14} /> Register Manually (ثبت دستی)</button>
+        <Modal isOpen={isSqlModalOpen} onClose={() => setIsSqlModalOpen(false)} title="Supabase Database Setup">
+          <div className="space-y-4">
+            <div className="flex items-center gap-3 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-xl text-amber-800 dark:text-amber-400">
+              <Info size={24} className="shrink-0" /><p className="text-sm">Copy the code below and paste it into the <b>SQL Editor</b> in Supabase.</p>
             </div>
-          )}
+            <div className="relative group">
+              <div className="absolute right-4 top-4 z-10"><CopyButton text={supabaseSql} big /></div>
+              <div className="bg-slate-900 dark:bg-black rounded-xl p-6 overflow-hidden border border-slate-800 dark:border-dark-border"><pre className="text-indigo-300 text-[13px] font-mono h-64 overflow-auto select-all">{supabaseSql}</pre></div>
+            </div>
+          </div>
+        </Modal>
 
-          {(isManualCoinEntry || parsedCoinData) && (
-            <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+        <Modal isOpen={isCoinModalOpen} onClose={closeCoinModal} title={editingCoinId ? "Edit Token" : "Add Token"}>
+          <div className="space-y-4">
+            {!editingCoinId && !isManualCoinEntry && (
+              <div className="flex flex-col gap-4">
+                 <div className="flex gap-2">
+                  <input type="text" value={newCoinUrl} onChange={e=>setNewCoinUrl(e.target.value)} placeholder="DexScreener URL or Symbol..." className="flex-1 p-3 border border-slate-300 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded-lg outline-none focus:ring-2 focus:ring-indigo-500" />
+                  <button onClick={handleParseCoin} disabled={isParsingCoin} className="bg-indigo-600 text-white px-4 py-3 rounded-lg flex items-center justify-center min-w-[60px]">{isParsingCoin ? <Loader2 className="animate-spin" /> : <Search />}</button>
+                </div>
+                <button onClick={() => { setIsManualCoinEntry(true); setParsedCoinData({ name: '', marketCap: '', liquidity: '', age: 'New', priceChange: '0%', network: Network.SOLANA, status: Status.GOOD, dexScreenerUrl: '', isFavorite: false, notes: '' }); }} className="text-indigo-600 dark:text-indigo-400 text-sm font-bold flex items-center justify-center gap-1 hover:underline"><Pencil size={14} /> Register Manually (ثبت دستی)</button>
+              </div>
+            )}
+
+            {(isManualCoinEntry || parsedCoinData) && (
+              <div className="space-y-4 animate-in fade-in slide-in-from-bottom-2">
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Token Symbol</label><input type="text" value={parsedCoinData?.name || ''} onChange={e=>setParsedCoinData({...parsedCoinData, name:e.target.value})} placeholder="e.g. BTC" className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500" /></div>
+                  <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Network</label><select value={parsedCoinData?.network} onChange={e=>setParsedCoinData({...parsedCoinData, network:e.target.value as Network})} className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500">{Object.values(Network).map(n=><option key={n} value={n}>{n}</option>)}</select></div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Status</label><select value={parsedCoinData?.status} onChange={e=>setParsedCoinData({...parsedCoinData, status:e.target.value as Status})} className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500">{Object.values(Status).map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+                  <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Liquidity</label><input type="text" value={parsedCoinData?.liquidity || ''} onChange={e=>setParsedCoinData({...parsedCoinData, liquidity:e.target.value})} placeholder="$500K" className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500" /></div>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Market Cap</label><input type="text" value={parsedCoinData?.marketCap || ''} onChange={e=>setParsedCoinData({...parsedCoinData, marketCap:e.target.value})} placeholder="$10M" className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500" /></div>
+                  <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">24H Change</label><input type="text" value={parsedCoinData?.priceChange || ''} onChange={e=>setParsedCoinData({...parsedCoinData, priceChange:e.target.value})} placeholder="+15%" className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500" /></div>
+                </div>
+                <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Token Link / URL</label><input type="text" value={parsedCoinData?.dexScreenerUrl || ''} onChange={e=>setParsedCoinData({...parsedCoinData, dexScreenerUrl:e.target.value})} placeholder="https://..." className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500" /></div>
+                
+                <div className="flex items-center gap-2 py-2">
+                  <input type="checkbox" id="coin-fav" checked={parsedCoinData?.isFavorite} onChange={e=>setParsedCoinData({...parsedCoinData, isFavorite: e.target.checked})} className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded" />
+                  <label htmlFor="coin-fav" className="text-sm font-bold text-slate-700 dark:text-slate-300 select-none">Mark as Favorite (علاقه‌مندی)</label>
+                </div>
+
+                <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Notes (یادداشت)</label><textarea value={parsedCoinData?.notes || ''} onChange={e=>setParsedCoinData({...parsedCoinData, notes:e.target.value})} placeholder="Extra details about this token..." className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded h-20 resize-none outline-none focus:border-indigo-500" /></div>
+
+                <button onClick={saveCoin} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-lg shadow-indigo-100 dark:shadow-none hover:bg-indigo-700 transition-all">Save Token</button>
+              </div>
+            )}
+          </div>
+        </Modal>
+
+        <Modal isOpen={isWalletModalOpen} onClose={closeWalletModal} title={editingWalletId ? "Edit Wallet" : "Add Wallet"}>
+          <div className="space-y-4">
+            {!editingWalletId && (
+              <div className="bg-indigo-50 dark:bg-indigo-900/20 p-4 rounded-xl border border-indigo-100 dark:border-indigo-900/50">
+                <label className="text-[10px] font-extrabold text-indigo-400 block mb-2 tracking-widest uppercase">Smart Auto-Fill</label>
+                <textarea value={rawWalletText} onChange={e=>setRawWalletText(e.target.value)} placeholder="Paste wallet stats here (e.g. from Telegram bots)..." className="w-full h-20 p-2 border border-indigo-200 dark:border-indigo-800 dark:bg-dark-bg dark:text-white rounded text-sm outline-none resize-none mb-2 focus:ring-1 focus:ring-indigo-300" />
+                <button onClick={handleManualSmartParse} className="w-full bg-indigo-600 text-white py-2 rounded font-bold text-sm flex justify-center items-center gap-1 hover:bg-indigo-700 transition-all"><Zap size={14} /> Parse Stats</button>
+              </div>
+            )}
+            <div className="space-y-4">
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Token Symbol</label><input type="text" value={parsedCoinData?.name || ''} onChange={e=>setParsedCoinData({...parsedCoinData, name:e.target.value})} placeholder="e.g. BTC" className="w-full p-2 border rounded outline-none focus:border-indigo-500" /></div>
-                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Network</label><select value={parsedCoinData?.network} onChange={e=>setParsedCoinData({...parsedCoinData, network:e.target.value as Network})} className="w-full p-2 border rounded outline-none focus:border-indigo-500">{Object.values(Network).map(n=><option key={n} value={n}>{n}</option>)}</select></div>
+                <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Network</label><select value={newWallet.network} onChange={e=>setNewWallet({...newWallet, network:e.target.value as Network})} className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500">{Object.values(Network).map(n=><option key={n} value={n}>{n}</option>)}</select></div>
+                <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Status</label><select value={newWallet.status} onChange={e=>setNewWallet({...newWallet, status:e.target.value as Status})} className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500">{Object.values(Status).map(s=><option key={s} value={s}>{s}</option>)}</select></div>
+              </div>
+              <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Wallet Address</label><input type="text" value={newWallet.address || ''} onChange={e=>setNewWallet({...newWallet, address:e.target.value})} placeholder="Wallet Address" className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500" /></div>
+              <div className="grid grid-cols-2 gap-4">
+                <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Source / Name</label><input type="text" value={newWallet.source || ''} onChange={e=>setNewWallet({...newWallet, source:e.target.value})} placeholder="e.g. Whale Hunter" className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500" /></div>
+                <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Win Rate (%)</label><input type="number" value={newWallet.winRate || 50} onChange={e=>setNewWallet({...newWallet, winRate: parseInt(e.target.value) || 0})} className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500" /></div>
               </div>
               <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Status</label><select value={parsedCoinData?.status} onChange={e=>setParsedCoinData({...parsedCoinData, status:e.target.value as Status})} className="w-full p-2 border rounded outline-none focus:border-indigo-500">{Object.values(Status).map(s=><option key={s} value={s}>{s}</option>)}</select></div>
-                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Liquidity</label><input type="text" value={parsedCoinData?.liquidity || ''} onChange={e=>setParsedCoinData({...parsedCoinData, liquidity:e.target.value})} placeholder="$500K" className="w-full p-2 border rounded outline-none focus:border-indigo-500" /></div>
+                <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Buy Vol</label><input type="text" value={newWallet.buyVolume || ''} onChange={e=>setNewWallet({...newWallet, buyVolume:e.target.value})} placeholder="$100" className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500" /></div>
+                <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Sell Vol</label><input type="text" value={newWallet.sellVolume || ''} onChange={e=>setNewWallet({...newWallet, sellVolume:e.target.value})} placeholder="$200" className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500" /></div>
               </div>
-              <div className="grid grid-cols-2 gap-4">
-                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Market Cap</label><input type="text" value={parsedCoinData?.marketCap || ''} onChange={e=>setParsedCoinData({...parsedCoinData, marketCap:e.target.value})} placeholder="$10M" className="w-full p-2 border rounded outline-none focus:border-indigo-500" /></div>
-                <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">24H Change</label><input type="text" value={parsedCoinData?.priceChange || ''} onChange={e=>setParsedCoinData({...parsedCoinData, priceChange:e.target.value})} placeholder="+15%" className="w-full p-2 border rounded outline-none focus:border-indigo-500" /></div>
-              </div>
-              <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Token Link / URL</label><input type="text" value={parsedCoinData?.dexScreenerUrl || ''} onChange={e=>setParsedCoinData({...parsedCoinData, dexScreenerUrl:e.target.value})} placeholder="https://..." className="w-full p-2 border rounded outline-none focus:border-indigo-500" /></div>
+              <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Profit / PnL</label><input type="text" value={newWallet.profit || ''} onChange={e=>setNewWallet({...newWallet, profit:e.target.value})} placeholder="+$100" className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500" /></div>
+              <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">DexScreener Link</label><input type="text" value={newWallet.customLink || ''} onChange={e=>setNewWallet({...newWallet, customLink:e.target.value})} placeholder="https://..." className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500" /></div>
+              <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">GMGN Link</label><input type="text" value={newWallet.gmgnLink || ''} onChange={e=>setNewWallet({...newWallet, gmgnLink:e.target.value})} placeholder="https://gmgn.ai/sol/address/..." className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded outline-none focus:border-indigo-500" /></div>
               
               <div className="flex items-center gap-2 py-2">
-                <input type="checkbox" id="coin-fav" checked={parsedCoinData?.isFavorite} onChange={e=>setParsedCoinData({...parsedCoinData, isFavorite: e.target.checked})} className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded" />
-                <label htmlFor="coin-fav" className="text-sm font-bold text-slate-700 select-none">Mark as Favorite (علاقه‌مندی)</label>
+                <input type="checkbox" id="wallet-fav" checked={newWallet.isFavorite} onChange={e=>setNewWallet({...newWallet, isFavorite: e.target.checked})} className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded" />
+                <label htmlFor="wallet-fav" className="text-sm font-bold text-slate-700 dark:text-slate-300 select-none">Mark as Favorite (علاقه‌مندی)</label>
               </div>
 
-              <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Notes (یادداشت)</label><textarea value={parsedCoinData?.notes || ''} onChange={e=>setParsedCoinData({...parsedCoinData, notes:e.target.value})} placeholder="Extra details about this token..." className="w-full p-2 border rounded h-20 resize-none outline-none focus:border-indigo-500" /></div>
-
-              <button onClick={saveCoin} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-lg shadow-indigo-100 hover:bg-indigo-700 transition-all">Save Token</button>
+              <div><label className="text-[10px] font-bold text-slate-400 dark:text-slate-500 block mb-1 uppercase tracking-wider">Notes (یادداشت)</label><textarea value={newWallet.notes || ''} onChange={e=>setNewWallet({...newWallet, notes:e.target.value})} placeholder="Extra info about this wallet..." className="w-full p-2 border border-slate-200 dark:border-dark-border dark:bg-dark-bg dark:text-white rounded h-20 resize-none outline-none focus:border-indigo-500" /></div>
+              
+              <button onClick={saveWallet} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition-all">Save Wallet</button>
             </div>
-          )}
-        </div>
-      </Modal>
-
-      <Modal isOpen={isWalletModalOpen} onClose={closeWalletModal} title={editingWalletId ? "Edit Wallet" : "Add Wallet"}>
-        <div className="space-y-4">
-          {!editingWalletId && (
-            <div className="bg-indigo-50 p-4 rounded-xl border border-indigo-100">
-              <label className="text-[10px] font-extrabold text-indigo-400 block mb-2 tracking-widest uppercase">Smart Auto-Fill</label>
-              <textarea value={rawWalletText} onChange={e=>setRawWalletText(e.target.value)} placeholder="Paste wallet stats here (e.g. from Telegram bots)..." className="w-full h-20 p-2 border border-indigo-200 rounded text-sm outline-none resize-none mb-2 focus:ring-1 focus:ring-indigo-300" />
-              <button onClick={handleManualSmartParse} className="w-full bg-indigo-600 text-white py-2 rounded font-bold text-sm flex justify-center items-center gap-1 hover:bg-indigo-700 transition-all"><Zap size={14} /> Parse Stats</button>
-            </div>
-          )}
-          <div className="space-y-4">
-            <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Network</label><select value={newWallet.network} onChange={e=>setNewWallet({...newWallet, network:e.target.value as Network})} className="w-full p-2 border rounded outline-none focus:border-indigo-500">{Object.values(Network).map(n=><option key={n} value={n}>{n}</option>)}</select></div>
-              <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Status</label><select value={newWallet.status} onChange={e=>setNewWallet({...newWallet, status:e.target.value as Status})} className="w-full p-2 border rounded outline-none focus:border-indigo-500">{Object.values(Status).map(s=><option key={s} value={s}>{s}</option>)}</select></div>
-            </div>
-            <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Wallet Address</label><input type="text" value={newWallet.address || ''} onChange={e=>setNewWallet({...newWallet, address:e.target.value})} placeholder="Wallet Address" className="w-full p-2 border rounded outline-none focus:border-indigo-500" /></div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Source / Name</label><input type="text" value={newWallet.source || ''} onChange={e=>setNewWallet({...newWallet, source:e.target.value})} placeholder="e.g. Whale Hunter" className="w-full p-2 border rounded outline-none focus:border-indigo-500" /></div>
-              <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Win Rate (%)</label><input type="number" value={newWallet.winRate || 50} onChange={e=>setNewWallet({...newWallet, winRate: parseInt(e.target.value) || 0})} className="w-full p-2 border rounded outline-none focus:border-indigo-500" /></div>
-            </div>
-            <div className="grid grid-cols-2 gap-4">
-              <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Buy Vol</label><input type="text" value={newWallet.buyVolume || ''} onChange={e=>setNewWallet({...newWallet, buyVolume:e.target.value})} placeholder="$100" className="w-full p-2 border rounded outline-none focus:border-indigo-500" /></div>
-              <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Sell Vol</label><input type="text" value={newWallet.sellVolume || ''} onChange={e=>setNewWallet({...newWallet, sellVolume:e.target.value})} placeholder="$200" className="w-full p-2 border rounded outline-none focus:border-indigo-500" /></div>
-            </div>
-            <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Profit / PnL</label><input type="text" value={newWallet.profit || ''} onChange={e=>setNewWallet({...newWallet, profit:e.target.value})} placeholder="+$100" className="w-full p-2 border rounded outline-none focus:border-indigo-500" /></div>
-            <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">DexScreener Link</label><input type="text" value={newWallet.customLink || ''} onChange={e=>setNewWallet({...newWallet, customLink:e.target.value})} placeholder="https://..." className="w-full p-2 border rounded outline-none focus:border-indigo-500" /></div>
-            <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">GMGN Link</label><input type="text" value={newWallet.gmgnLink || ''} onChange={e=>setNewWallet({...newWallet, gmgnLink:e.target.value})} placeholder="https://gmgn.ai/sol/address/..." className="w-full p-2 border rounded outline-none focus:border-indigo-500" /></div>
-            
-            <div className="flex items-center gap-2 py-2">
-              <input type="checkbox" id="wallet-fav" checked={newWallet.isFavorite} onChange={e=>setNewWallet({...newWallet, isFavorite: e.target.checked})} className="w-4 h-4 text-indigo-600 focus:ring-indigo-500 border-slate-300 rounded" />
-              <label htmlFor="wallet-fav" className="text-sm font-bold text-slate-700 select-none">Mark as Favorite (علاقه‌مندی)</label>
-            </div>
-
-            <div><label className="text-[10px] font-bold text-slate-400 block mb-1 uppercase tracking-wider">Notes (یادداشت)</label><textarea value={newWallet.notes || ''} onChange={e=>setNewWallet({...newWallet, notes:e.target.value})} placeholder="Extra info about this wallet..." className="w-full p-2 border rounded h-20 resize-none outline-none focus:border-indigo-500" /></div>
-            
-            <button onClick={saveWallet} className="w-full bg-indigo-600 text-white py-3 rounded-lg font-bold shadow-lg hover:bg-indigo-700 transition-all">Save Wallet</button>
           </div>
-        </div>
-      </Modal>
+        </Modal>
+      </div>
     </div>
   );
 }
