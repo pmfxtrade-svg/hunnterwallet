@@ -48,6 +48,20 @@ export interface Wallet {
   notes?: string;
 }
 
+export interface WallWallet {
+  id: string;
+  address: string;
+  name: string; // Name or Label from Hyperdash
+  winRate: number;
+  roi: string; // Return on Investment
+  pnl: string; // Profit and Loss
+  totalTrades: number;
+  avgEntry: string;
+  hyperdashUrl: string;
+  dateAdded: string;
+  notes?: string;
+}
+
 export interface StatsData {
   totalCoins: number;
   totalWallets: number;

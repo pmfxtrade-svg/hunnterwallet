@@ -94,3 +94,46 @@ export const parseDexScreenerData = async (query: string) => {
     throw error;
   }
 };
+
+/**
+ * پارسر مخصوص سایت Hyperdash
+ * توجه: به دلیل محدودیت CORS مرورگرها، امکان دریافت مستقیم HTML سایت‌های دیگر وجود ندارد.
+ * این تابع آدرس را استخراج کرده و داده‌های نمونه را برمی‌گرداند.
+ */
+export const parseHyperdashData = async (url: string) => {
+    // 1. اعتبارسنجی لینک و استخراج آدرس
+    const cleanUrl = url.trim();
+    if (!cleanUrl.includes('hyperdash.com')) {
+        throw new Error('Invalid Hyperdash URL');
+    }
+
+    // تلاش برای پیدا کردن آدرس کیف پول در URL
+    // فرمت معمول: https://legacy.hyperdash.com/wallet/ADDRESS یا مشابه
+    // ما فرض می‌کنیم هر رشته طولانی در URL آدرس است
+    const addressMatch = cleanUrl.match(/[a-zA-Z0-9]{32,44}/);
+    const address = addressMatch ? addressMatch[0] : 'Unknown Address';
+
+    // شبیه‌سازی تاخیر شبکه
+    await new Promise(resolve => setTimeout(resolve, 1500));
+
+    // در یک محیط واقعی، اینجا باید به یک پروکسی سرور درخواست بفرستید
+    // فعلا داده‌های تصادفی اما واقعی‌گرایانه تولید می‌کنیم تا UI تست شود
+    
+    const randomPnL = (Math.random() * 10000).toFixed(2);
+    const isPositive = Math.random() > 0.3;
+    const pnl = isPositive ? `+$${randomPnL}` : `-$${randomPnL}`;
+    const roi = isPositive ? `+${(Math.random() * 500).toFixed(0)}%` : `-${(Math.random() * 50).toFixed(0)}%`;
+    const winRate = Math.floor(Math.random() * (90 - 30) + 30);
+    const trades = Math.floor(Math.random() * 500);
+
+    return {
+        address: address,
+        name: `HyperDash Wallet ${address.slice(0, 4)}`,
+        winRate: winRate,
+        roi: roi,
+        pnl: pnl,
+        totalTrades: trades,
+        avgEntry: `$${(Math.random() * 0.5).toFixed(4)}`,
+        hyperdashUrl: cleanUrl
+    };
+};
