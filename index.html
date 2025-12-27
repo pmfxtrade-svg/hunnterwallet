@@ -26,9 +26,7 @@
       }
     </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
-    
-    <!-- Fix: Add type="text/tailwindcss" for @apply to work with CDN -->
-    <style type="text/tailwindcss">
+    <style>
       body {
         font-family: 'Inter', sans-serif;
         @apply bg-slate-50 dark:bg-dark-bg text-slate-900 dark:text-dark-text;
@@ -57,30 +55,24 @@
         background: #374151;
       }
     </style>
-
-    <!-- Polyfill for global/process causing white screen in some builds -->
     <script>
-      window.global = window;
-      window.process = window.process || {
-        env: { NODE_ENV: 'production' },
-        version: '',
-        browser: true,
-        cwd: function() { return '/'; }
-      };
+      window.process = window.process || {};
+      window.process.env = window.process.env || {};
+      window.process.browser = true;
+      window.process.version = "";
+      window.process.cwd = function() { return "/"; };
     </script>
-
-    <!-- Use Stable React 18 versions to avoid version mismatch errors -->
-    <script type="importmap">
-    {
-      "imports": {
-        "react": "https://esm.sh/react@18.3.1",
-        "react-dom/": "https://esm.sh/react-dom@18.3.1/",
-        "react/": "https://esm.sh/react@18.3.1/",
-        "lucide-react": "https://esm.sh/lucide-react@0.294.0", 
-        "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.39.0"
-      }
-    }
-    </script>
+  <script type="importmap">
+{
+  "imports": {
+    "react": "https://esm.sh/react@^19.2.3",
+    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
+    "react/": "https://esm.sh/react@^19.2.3/",
+    "lucide-react": "https://esm.sh/lucide-react@^0.562.0",
+    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@^2.49.1"
+  }
+}
+</script>
 </head>
   <body>
     <div id="root"></div>
