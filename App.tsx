@@ -411,26 +411,6 @@ export default function App() {
 
   const saveCoin = async () => {
     if (!parsedCoinData || !parsedCoinData.name || !session?.user?.id) return;
-    
-    // Check for duplicates on the same day
-    if (!editingCoinId) {
-      const today = new Date();
-      const duplicate = coins.find(c => {
-        const cDate = new Date(c.dateAdded);
-        const isSameDay = cDate.getDate() === today.getDate() && 
-                          cDate.getMonth() === today.getMonth() && 
-                          cDate.getFullYear() === today.getFullYear();
-        return isSameDay && 
-               c.name.toLowerCase() === (parsedCoinData.name || '').toLowerCase() && 
-               c.network === parsedCoinData.network;
-      });
-
-      if (duplicate) {
-        alert("این ارز در تاریخ امروز قبلاً به واچ‌لیست اضافه شده است!");
-        return;
-      }
-    }
-
     const payload = {
       user_id: session.user.id,
       name: parsedCoinData.name, market_cap: parsedCoinData.marketCap || '$0', liquidity: parsedCoinData.liquidity || '$0',
